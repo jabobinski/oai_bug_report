@@ -16,6 +16,13 @@ SEGMENTS = [
     "Observed Results",
     "Expected Results"
 ]
+PROMPTS = {
+    "Verification Builds": "Please describe the verification builds used, focusing on versions and environments.",
+    "Summary": "Provide a concise summary of the bug.",
+    "Repro Steps": "List clear and step-by-step instructions to reproduce the bug.",
+    "Observed Results": "Describe what actually happens when the bug occurs.",
+    "Expected Results": "Explain what the expected correct behavior should be."
+}
 
 class BugTicketApp:
     def __init__(self, master):
@@ -59,9 +66,8 @@ class BugTicketApp:
         
         for segment in SEGMENTS:
             prompt = (
-                f"Based on the full bug description below, generate the '{segment}' section of a bug ticket. "
-                "Write concisely and clearly. Include only information relevant to this segment.\n\n"
-                f"Full Description: {full_desc}"
+                f"{PROMPTS[segment]}\n\n"
+                f"Full Bug Description: {full_desc}"
             )
             answer = self.call_ai(prompt, history)
             history.append((segment, answer))
