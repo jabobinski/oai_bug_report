@@ -3,6 +3,8 @@ from openai import OpenAI
 import tkinter as tk
 from tkinter import scrolledtext, messagebox
 
+#Script is based on fine-tuned model, will not work properly without changing it to User's own fine-tuned model. Generate it at fine_tune.py and change model below.
+
 oai_key = os.getenv('OPENAI_API_KEY')
 if not oai_key:
     raise ValueError("OPENAI API KEY was not set")
@@ -18,24 +20,19 @@ SEGMENTS = [
 ]
 PROMPTS = {
     "Verification Builds": {
-        "text": "Please describe ONLY the verification builds used, focusing on versions and environments. Use MAX 20 words",
-        "max_tokens": 50 #doesnt work as intended, will figure it out later
+        "text": "Verification Builds:"
     },
     "Summary": {
-        "text": "Provide ONLY a summary of the described bug below. Use MAX 10 words",
-        "max_tokens": 30
+        "text": "Summary:"
     },
     "Repro Steps": {
-        "text": "Return ONLY a list step-by-step instructions to reproduce bug described below.",
-        "max_tokens": 100
+        "text": "Repro Steps:"
     },
     "Observed Results": {
-        "text": "Describe what actually happens when the bug occurs. Use MAX 25 words",
-        "max_tokens": 50
+        "text": "Observed Results:"
     },
     "Expected Results": {
-        "text": "Explain what the expected correct behavior should be. Use MAX 25 words",
-        "max_tokens": 50
+        "text": "Expected Results:"
     }
 }
 
@@ -55,7 +52,7 @@ class BugTicketApp:
         self.output = scrolledtext.ScrolledText(master, height=16)
         self.output.pack(fill='both', expand=True)
 
-    def call_ai(self, prompt, history, max_tokens):
+    def call_ai(self, prompt, history):
         messages = [{"role": "system", "content": "You are a helpful assistant for generating bug tickets."}]
 
         for seg, text in history:
@@ -64,10 +61,9 @@ class BugTicketApp:
         messages.append({"role": "user", "content": prompt})
 
         resp = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="ft:gpt-3.5-turbo-0125:personal::C10DdGOL", #change to your fine-tuned model
             messages=messages,
-            temperature=0.1,
-            max_tokens=max_tokens
+            temperature=0.3
         )
         answer = resp.choices[0].message.content.strip()
         tokens_used = resp.usage.total_tokens
@@ -85,13 +81,12 @@ class BugTicketApp:
         
         for segment in SEGMENTS:
             prompt_text = PROMPTS[segment]["text"]
-            max_tokens = PROMPTS[segment]["max_tokens"]
 
             prompt = (
                 f"{prompt_text}\n\n"
                 f"Full Bug Description: {full_desc}"
             )
-            answer, tokens = self.call_ai(prompt, history, max_tokens)
+            answer, tokens = self.call_ai(prompt, history)
             print(f"Segment '{segment}' used {tokens} tokens")
             history.append((segment, answer))
             results.append((segment, answer))
