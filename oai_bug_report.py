@@ -17,11 +17,26 @@ SEGMENTS = [
     "Expected Results"
 ]
 PROMPTS = {
-    "Verification Builds": "Please describe the verification builds used, focusing on versions and environments.",
-    "Summary": "Provide a concise summary of the bug.",
-    "Repro Steps": "List clear and step-by-step instructions to reproduce the bug.",
-    "Observed Results": "Describe what actually happens when the bug occurs.",
-    "Expected Results": "Explain what the expected correct behavior should be."
+    "Verification Builds": {
+        "text": "Please describe ONLY the verification builds used, focusing on versions and environments. Use MAX 20 words",
+        "max_tokens": 50 #doesnt work as intended, will figure it out later
+    },
+    "Summary": {
+        "text": "Provide ONLY a summary of the described bug below. Use MAX 10 words",
+        "max_tokens": 30
+    },
+    "Repro Steps": {
+        "text": "Return ONLY a list step-by-step instructions to reproduce bug described below.",
+        "max_tokens": 100
+    },
+    "Observed Results": {
+        "text": "Describe what actually happens when the bug occurs. Use MAX 25 words",
+        "max_tokens": 50
+    },
+    "Expected Results": {
+        "text": "Explain what the expected correct behavior should be. Use MAX 25 words",
+        "max_tokens": 50
+    }
 }
 
 class BugTicketApp:
@@ -40,7 +55,7 @@ class BugTicketApp:
         self.output = scrolledtext.ScrolledText(master, height=16)
         self.output.pack(fill='both', expand=True)
 
-    def call_ai(self, prompt, history):
+    def call_ai(self, prompt, history, max_tokens):
         messages = [{"role": "system", "content": "You are a helpful assistant for generating bug tickets."}]
 
         for seg, text in history:
@@ -51,9 +66,13 @@ class BugTicketApp:
         resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=messages,
-            temperature=0.1
+            temperature=0.1,
+            max_tokens=max_tokens
         )
-        return resp.choices[0].message.content.strip()
+        answer = resp.choices[0].message.content.strip()
+        tokens_used = resp.usage.total_tokens
+
+        return answer, tokens_used
 
     def generate_ticket(self):
         full_desc = self.desc_input.get('1.0', tk.END).strip()
@@ -65,17 +84,21 @@ class BugTicketApp:
         results = []
         
         for segment in SEGMENTS:
+            prompt_text = PROMPTS[segment]["text"]
+            max_tokens = PROMPTS[segment]["max_tokens"]
+
             prompt = (
-                f"{PROMPTS[segment]}\n\n"
+                f"{prompt_text}\n\n"
                 f"Full Bug Description: {full_desc}"
             )
-            answer = self.call_ai(prompt, history)
+            answer, tokens = self.call_ai(prompt, history, max_tokens)
+            print(f"Segment '{segment}' used {tokens} tokens")
             history.append((segment, answer))
             results.append((segment, answer))
 
         ticket_text = ""
         for seg, text in results:
-            ticket_text += f"## {seg}\n{text}\n\n"
+            ticket_text += f"{seg}\n{text}\n\n"
 
         self.output.delete('1.0', tk.END)
         self.output.insert(tk.END, ticket_text)
