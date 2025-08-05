@@ -11,30 +11,14 @@ if not oai_key:
 
 client = OpenAI(api_key=oai_key)
 
+FINETUNED_MODEL = "ft:gpt-3.5-turbo-0125:personal::C10DdGOL" #change to your fine-tuned model
+
 SEGMENTS = [
-    "Verification Builds",
     "Summary",
     "Repro Steps",
     "Observed Results",
     "Expected Results"
 ]
-PROMPTS = {
-    "Verification Builds": {
-        "text": "Verification Builds:"
-    },
-    "Summary": {
-        "text": "Summary:"
-    },
-    "Repro Steps": {
-        "text": "Repro Steps:"
-    },
-    "Observed Results": {
-        "text": "Observed Results:"
-    },
-    "Expected Results": {
-        "text": "Expected Results:"
-    }
-}
 
 class BugTicketApp:
     def __init__(self, master):
@@ -52,43 +36,39 @@ class BugTicketApp:
         self.output = scrolledtext.ScrolledText(master, height=16)
         self.output.pack(fill='both', expand=True)
 
-    def call_ai(self, prompt, history):
-        messages = [{"role": "system", "content": "You are a helpful assistant for generating bug tickets."}]
-
-        for seg, text in history:
-            messages.append({"role": "assistant", "content": f"{seg}: {text}"})
-
-        messages.append({"role": "user", "content": prompt})
+    def call_ai(self, segment, full_desc):
+        messages = [
+            {"role": "system", "content": "Bug ticket generator"},
+            {"role": "user", "content": (
+            f"Write ONLY the {segment} part for the bug described below."
+            f"Do not include any other sections or text out of this range."
+            f"Keep the response short and complete."
+            f"End with '[END OF {segment}]'.\n\n"
+            f"Bug Description:\n{full_desc}"
+        )}
+        ]
 
         resp = client.chat.completions.create(
-            model="ft:gpt-3.5-turbo-0125:personal::C10DdGOL", #change to your fine-tuned model
+            model=FINETUNED_MODEL,
             messages=messages,
-            temperature=0.3
+            temperature=0.1
         )
         answer = resp.choices[0].message.content.strip()
+        answer = answer.replace(f"[END OF {segment}]", "").strip()
         tokens_used = resp.usage.total_tokens
-
         return answer, tokens_used
 
     def generate_ticket(self):
         full_desc = self.desc_input.get('1.0', tk.END).strip()
         if not full_desc:
-            messagebox.showwarning("Input needed", "Please enter the full bug descriptiob")
+            messagebox.showwarning("Input needed", "Please enter the full bug description")
             return
 
-        history = []
         results = []
-        
-        for segment in SEGMENTS:
-            prompt_text = PROMPTS[segment]["text"]
 
-            prompt = (
-                f"{prompt_text}\n\n"
-                f"Full Bug Description: {full_desc}"
-            )
-            answer, tokens = self.call_ai(prompt, history)
+        for segment in SEGMENTS:
+            answer, tokens = self.call_ai(segment, full_desc)
             print(f"Segment '{segment}' used {tokens} tokens")
-            history.append((segment, answer))
             results.append((segment, answer))
 
         ticket_text = ""
